@@ -1,10 +1,10 @@
 <?php
 
-/* ---------------- */
+/* ================ */
 /* WP Debug Session */
 /* ---------------- */
-/* . Version 1.03 . */
-/* ---------------- */
+/* . Version 1.04 . */
+/* ================ */
 
 // Home: https://gist.github.com/majick777/6c4e4074ce4a59fe09f7baa855732aee
 // Author: DreamJester of http://wordquest.org/
@@ -31,12 +31,6 @@
 // 4. [Optional] Change your querystring keys below to something more obscure to restrict access.
 // 5. [Reminder] Set ?wpdebug=0 to end a debug session before session timeout (destroys cookie.)
 
-// define querystring keys
-$wp_debug_keys = array(
-	'switch' => 'wpdebug', 'log' => 'debuglog', 'display' => 'debugdisplay', 'html' => 'debughtml',
-	'backtrace' => 'debugbacktrace', 'ip' => 'debugip', 'id' => 'debugid'
-);
-
 // Querystring Switch Values
 // -------------------------
 // Note: debugging states can also be "forced" as static by defining constants noted.
@@ -52,7 +46,7 @@ $wp_debug_keys = array(
 //				1 or 'on' = turn direct debug display output on
 //				2 or 'shutdown' = output on shutdown (default) [WP_DEBUG_ON_SHUTDOWN]
 //				3 or 'console' = output to browser console [WP_DEBUG_TO_CONSOLE]
-// debugbacktrace - full debug backtrace: 0 or 'off', 1 or 'on [WP_DEBUG_BACKTRACE]
+// debugbacktrace - full debug backtrace: 0 or 'off', 1 or 'on' [WP_DEBUG_BACKTRACE]
 //				(backtrace is only output in display on shutdown mode)
 // debughtml - HTML for display output: 0 or 'off', 1 or 'on' [WP_DEBUG_TEXT_ONLY]
 //				(only valid if debugdisplay is 'on' or 'shutdown')
@@ -62,74 +56,92 @@ $wp_debug_keys = array(
 // debugclear - remove all lines from debug log for a specific debug ID session
 //				(set value to debug session ID to clear from log)
 
-// set default settings
+// --- define querystring keys ---
+$wp_debug_keys = array(
+	'switch' => 'wpdebug', 'log' => 'debuglog', 'display' => 'debugdisplay', 'html' => 'debughtml',
+	'backtrace' => 'debugbacktrace', 'ip' => 'debugip', 'id' => 'debugid'
+);
+
+// --- set default settings ---
 $wp_debug = array(
 	'switch' => '0', 'log' => '1', 'display' => '2', 'backtrace' => '1',
 	'html' => '1', 'ip' => '0', 'id' => NULL, 'info' => ''
 );
 
-// loop to get/change settings
-$clearcookies = false;
-foreach ($wp_debug_keys as $setting => $key) {
-
-	// check for existing cookies
-	if (isset($_COOKIE[$key])) {
-		if ( (is_numeric($_COOKIE[$key])) && ($_COOKIE[$key] > 0) ) {
-			$wp_debug[$setting] = (int)$_COOKIE[$key];
-		} elseif ($setting == 'id') {$wp_debug[$setting] = $_COOKIE[$key];}
-	}
-
-	// check for querystring changes
-	if (isset($_GET[$key])) {
-
-		// set shorthand value
-		$value = $_GET[$key];
-
-		// map any querystring word values to numerical
-		if ($value == 'on') {$value = '1';}
-		if ($key == $wp_debug_keys['log']) {
-			if ($value == 'log') {$value = '1';}
-			if ($value == 'separate') {$value = '2';}
-			if ($value == 'log4php') {$value = '3';}
-			if ($value == 'custom') {$value = '4';}
-		}
-		if ($key == $wp_debug_keys['display']) {
-			if ($value == 'display') {$value = '1';}
-			if ($value == 'console') {$value = '2';}
-			if ($value == 'shutdown') {$value = '3';}
-		}
-
-		if ($key == $wp_debug_keys['html']) {
-			if ($value == 'nohtml') {$value = '1';}
-			if ($value == 'textonly') {$value = '1';}
-		}
-
-		// set key value and matching cookie
-		if ( ($value == '0') || ($value == 'off') ) {
-			$wp_debug[$setting] = 0; setcookie($key, '', time() - 3600);
-			if ($setting == 'switch') {$clearcookies = true;}
-		} elseif ( (is_numeric($value)) && ($value > 0) ) {
-			$wp_debug[$setting] = (int)$value;
-			// use wpdebug setting as minutes for expiry
-			if ($key == $wp_debug_keys['switch']) {
-				$expiry = time() + ((int)$value * 60);
-				// set extra cookie for calculating expiry display
-				setcookie('debugexpiry', $expiry, $expiry);
-			}
-			if (isset($expiry)) {$expires = $expiry;} else {$expires = time() + 3600;}
-			setcookie($key, (int)$value, $expires);
-		} elseif ($setting == 'id') {
-			$wp_debug['id'] = preg_replace("/[^0-9a-zA-Z]/i", '', $value);
-			if (isset($expiry)) {$expires = $expiry;} else {$expires = time() + 3600;}
-			setcookie($key, $value, $expires);
-		}
-	} elseif ($clearcookies) {
-		// maybe clear cookies (if wpdebug=0)
+// --- maybe clear all cookies ---
+// 1.0.4: do check to maybe clear all cookies first
+if ( isset($_GET[$wp_debug_keys['switch']]) && in_array($_GET[$wp_debug_keys['switch']], array('0', 'off')) ) {
+	foreach ($wp_debug_keys as $setting => $key) {
 		$wp_debug[$setting] = 0; setcookie($key, '', time() - 3600);
+	}
+} else {
+
+	// --- loop to get/change settings ---
+	foreach ($wp_debug_keys as $setting => $key) {
+
+		// --- check for existing cookies ---
+		if (isset($_COOKIE[$key])) {
+			if ( (is_numeric($_COOKIE[$key])) && ($_COOKIE[$key] > 0) ) {
+				$wp_debug[$setting] = (int)$_COOKIE[$key];
+			} elseif ($setting == 'id') {$wp_debug[$setting] = $_COOKIE[$key];}
+		}
+
+		// --- check for querystring changes ---
+		if (isset($_GET[$key])) {
+
+			// --- set shorthand value ---
+			$value = $_GET[$key];
+
+			// --- map any querystring word values to numerical ---
+			if ($value == 'on') {$value = '1';}
+			if ($key == $wp_debug_keys['log']) {
+				if ($value == 'log') {$value = '1';}
+				if ($value == 'separate') {$value = '2';}
+				if ($value == 'log4php') {$value = '3';}
+				if ($value == 'custom') {$value = '4';}
+			}
+			if ($key == $wp_debug_keys['display']) {
+				if ($value == 'display') {$value = '1';}
+				if ($value == 'console') {$value = '2';}
+				if ($value == 'shutdown') {$value = '3';}
+			}
+
+			if ($key == $wp_debug_keys['html']) {
+				if ($value == 'nohtml') {$value = '1';}
+				if ($value == 'textonly') {$value = '1';}
+			}
+
+			// --- set key value and matching cookie ---
+			if ( ($value == '0') || ($value == 'off') ) {
+
+				// --- remove this cookie ---
+				$wp_debug[$setting] = 0; setcookie($key, '', time() - 3600);
+
+			} elseif ( (is_numeric($value)) && ($value > 0) ) {
+
+				// --- use wpdebug setting as minutes for expiry ---
+				$wp_debug[$setting] = (int)$value;
+				if ($key == $wp_debug_keys['switch']) {
+					$expiry = time() + ((int)$value * 60);
+					// --- set extra cookie for calculating expiry display ---
+					setcookie('debugexpiry', $expiry, $expiry);
+				}
+				if (isset($expiry)) {$expires = $expiry;} else {$expires = time() + 3600;}
+				setcookie($key, (int)$value, $expires);
+
+			} elseif ($setting == 'id') {
+
+				// --- sanitize and set session ID cookie ---
+				$wp_debug['id'] = preg_replace("/[^0-9a-zA-Z]/i", '', $value);
+				if (isset($expiry)) {$expires = $expiry;} else {$expires = time() + 3600;}
+				setcookie($key, $value, $expires);
+
+			}
+		}
 	}
 }
 
-// maybe set WP_DEBUG debug mode
+// --- maybe set WP_DEBUG debug mode ---
 if ($wp_debug['switch'] > 0) {
 	if (!defined('WP_DEBUG')) {define('WP_DEBUG', true);}
 	$wp_debug['info'] = 'WP Debug Session Active. ';
@@ -143,7 +155,7 @@ if ($wp_debug['switch'] > 0) {
 	$wp_debug['info'] .= $timeleft.' minute'.$plural.' remaining. ';
 }
 
-// catch for any already defined constants (forced states)
+// --- check for any already defined constants (forced states) ---
 if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {$wp_debug['log'] = '1';}
 if (defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY) {
 	if (defined('WP_DEBUG_ON_SHUTDOWN') && WP_DEBUG_ON_SHUTDOWN) {$wp_debug['display'] = '3';}
@@ -155,12 +167,12 @@ if (defined('WP_DEBUG_TEXT_ONLY') && WP_DEBUG_TEXT_ONLY) {$wp_debug['html'] = '1
 if (defined('WP_DEBUG_IP') && WP_DEBUG_IP) {$wp_debug['ip'] = '1';}
 if (defined('WP_DEBUG_SESSION') && WP_DEBUG_SESSION) {$wp_debug['id'] = WP_DEBUG_SESSION;}
 
-// set default log file path
+// --- set default log file path ---
 if (defined('WP_CONTENT_DIR')) {$wp_debug['logfile'] = WP_CONTENT_DIR.'/debug.log';}
 elseif (defined('ABSPATH')) {$wp_debug['logfile'] = ABSPATH.'wp-content/debug.log';}
 else {$wp_debug['logfile'] = dirname(__FILE__).'/wp-content/debug.log';}
 
-// maybe add IP address info
+// --- maybe add IP address info ---
 if ($wp_debug['ip'] == '1') {
 	if (!empty($_SERVER['HTTP_CLIENT_IP'])) {$ip = $_SERVER['HTTP_CLIENT_IP'];}
 	elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];}
@@ -169,17 +181,17 @@ if ($wp_debug['ip'] == '1') {
 	$wp_debug['info'] .= 'IP: '.$ip.'. ';
 }
 
-// maybe define debug session ID
+// --- maybe define debug session ID ---
 if ( ($wp_debug['id'] != NULL) && (!defined('WP_DEBUG_SESSION')) ) {
 	$id = preg_replace("/[^0-9a-zA-Z]/i", '', $wp_debug['id']);
 	define('WP_DEBUG_SESSION', $id);
 	$wp_debug['info'] .= 'Session "'.$id.'". ';
 }
 
-// maybe set debug log mode
+// --- maybe set debug log mode ---
 if ($wp_debug['log'] > 0) {
 
-	// maybe prepend error info string (if not using error handler class)
+	// --- maybe prepend error info string (if not using error handler class) ---
 	if ( ($wp_debug['display'] == '0') || ($wp_debug['display'] == '1') ) {
 		$prepend = '';
 		if (defined('WP_DEBUG_IP') && WP_DEBUG_IP) {$prepend = WP_DEBUG_IP_ADDRESS.' ';}
@@ -189,21 +201,21 @@ if ($wp_debug['log'] > 0) {
 
 	if ($wp_debug['log'] == '1') {
 
-		// 1 [on/log]: standard debug log mode
+		// --- 1 [on/log]: standard debug log mode ---
 		// (note: logging is only triggered if WP_DEBUG is true)
 		if (!defined('WP_DEBUG_LOG')) {define('WP_DEBUG_LOG', true);}
 		$wp_debug['info'] .= 'Logging to /wp-content/debug.log... ';
 
 	} elseif ($wp_debug['log'] == '2') {
 
-		// 2 [separate]: use separate /wp-content/debug-session.log file
+		// --- 2 [separate]: use separate /wp-content/debug-session.log file ---
 		// note: this will log errors even if WP_DEBUG is set to false!
 		// ...but fails to write at all to this file on many servers :-(
 		if (defined('WP_CONTENT_DIR')) {$logfile = WP_CONTENT_DIR.'/debug-session.log';}
 		elseif (defined('ABSPATH')) {$logfile = ABSPATH.'wp-content/debug-session.log';}
 		else {$logfile = dirname(__FILE__).'/wp-content/debug-session.log';}
 
-		// fallback if the alternative debug log file path is not writeable
+		// --- fallback if the alternative debug log file path is not writeable ---
 		if (is_writeable($logfile)) {
 			if (!defined('WP_DEBUG_LOG')) {define('WP_DEBUG_LOG', false);}
 			$wp_debug['logfile'] = $logfile;
@@ -228,14 +240,14 @@ if ($wp_debug['log'] > 0) {
 	}
 } elseif (!defined('WP_DEBUG_LOG')) {define('WP_DEBUG_LOG', false);}
 
-// maybe set debug display mode
+// --- maybe set debug display mode ---
 if ( ($wp_debug['switch'] > 0) && ($wp_debug['display'] > 0) ) {
 
-	// 1 [on]: standard error output display
+	// --- 1 [on]: standard error output display ---
 	if (!defined('WP_DEBUG_DISPLAY')) {define('WP_DEBUG_DISPLAY', true);}
 	@ini_set('display_errors', 1);
 
-	// 2 [shutdown]: output all errors on shutdown (default)
+	// --- 2 [shutdown]: output all errors on shutdown (default) ---
 	if ($wp_debug['display'] == '2') {
 		define('WP_DEBUG_ON_SHUTDOWN', true);
 		global $errorhandler;
@@ -247,7 +259,7 @@ if ( ($wp_debug['switch'] > 0) && ($wp_debug['display'] > 0) ) {
 		}
 	}
 
-	// 3 [console]: browser console log errors
+	// --- 3 [console]: browser console log errors ---
 	if ($wp_debug['display'] == '3') {
 		@ini_set('html_errors', false);
 		define('WP_DEBUG_TO_CONSOLE', true);
@@ -255,7 +267,7 @@ if ( ($wp_debug['switch'] > 0) && ($wp_debug['display'] > 0) ) {
 		$errorhandler = new DebugErrorHandler();
 	}
 
-	// maybe no HTML display output
+	// --- maybe no HTML display output ---
 	if ($wp_debug['html'] == '0') {
 		@ini_set('html_errors', false);
 		if (!defined('WP_DEBUG_TEXT_ONLY')) {define('WP_DEBUG_TEXT_ONLY', true);}
@@ -263,7 +275,8 @@ if ( ($wp_debug['switch'] > 0) && ($wp_debug['display'] > 0) ) {
 	}
 } elseif (!defined('WP_DEBUG_DISPLAY')) {define('WP_DEBUG_DISPLAY', false);}
 
-// maybe clear log file of a specified debug session ID (or error type)
+// --- maybe clear log file of a specified debug session ID ---
+// (or error type eg. E_ERROR, E_NOTICE etc.)
 if (isset($_GET['debugclear'])) {
 	$id = preg_replace("/[^0-9a-zA-Z]/i", '', $_GET['debugclear']);
 	if ($id != '') {
@@ -292,11 +305,11 @@ if (isset($_GET['debugclear'])) {
 	}
 }
 
-// set debug info constant
+// --- set debug info constant ---
 if (!defined('WP_DEBUG_INFO')) {define('WP_DEBUG_INFO', $wp_debug['info']);}
 if (!defined('WP_DEBUG_IP_ADDRESS')) {define('WP_DEBUG_IP_ADDRESS', '');}
 
-// manual debug option debug values
+// --- manual debug session debug values ---
 // echo "<!-- WP Debug Session Options: "; print_r($wp_debug); echo " -->";
 
 
@@ -341,10 +354,10 @@ class DebugErrorHandler {
 
 	public function __construct() {
 
-		// set error handling method
+		// --- set error handling method ---
 		set_error_handler(array($this, 'error_handler'));
 
-		// set shutdown handling method
+		// --- set shutdown handling method ---
 		register_shutdown_function(array($this, 'shutdown_handler'));
 
 		// set exception handling method [disabled, see function for info]
@@ -352,14 +365,15 @@ class DebugErrorHandler {
 
     }
 
-	public static function set_throwable($e_number, $e_text, $e_file, $e_line, $e_log = TRUE) {
+	public static function set_throwable($number, $text, $file, $line, $log = TRUE) {
 
-		// maybe log to error log
-		if ($e_log) {
-			// set default error message
-			$message = self::$error_types[$e_number].': line '.$e_line.' in '.$e_file.': '.$e_text;
+		// --- maybe log to error log ---
+		if ($log) {
 
-			// maybe add debug session ID to log message
+			// --- set default error message ---
+			$message = self::$error_types[$number].': line '.$line.' in '.$file.': '.$text;
+
+			// --- maybe add debug session ID to log message ---
 			if (defined('WP_DEBUG_SESSION') && WP_DEBUG_SESSION) {
 				// force debug session ID to alphanumeric (to be safest)
 				$id = preg_replace("/[^0-9a-zA-Z]/i", '', WP_DEBUG_SESSION);
@@ -376,54 +390,54 @@ class DebugErrorHandler {
 			// }
 		}
 
-		// no display output if error message was suppressed using @
+		// --- no display output if error message was suppressed using @ ---
 		if (0 === error_reporting()) {return;}
 
-		// maybe output error to display
-		if (WP_DEBUG_DISPLAY) {self::output_error(self::$error_types[$e_number], $e_text, $e_file, $e_line);}
+		// --- maybe output error to display ---
+		if (WP_DEBUG_DISPLAY) {self::output_error(self::$error_types[$number], $text, $file, $line);}
 
-		// store errors for shutdown display
-		$error = array('type' => self::$error_types[$e_number], 'text' => $e_text, 'file' => $e_file, 'line' => $e_line);
+		// --- store errors for shutdown display ---
+		$error = array('type' => self::$error_types[$number], 'text' => $text, 'file' => $file, 'line' => $line);
 		if (defined('WP_DEBUG_BACKTRACE') && WP_DEBUG_BACKTRACE) {$error['backtrace'] = debug_backtrace();}
 		self::$throwables[] = $error;
 
-		// disable default error reporting
+		// --- disable default error reporting ---
 		return true;
 	}
 
-	public static function output_error($e_type, $e_text, $e_file, $e_line, $shutdown = FALSE) {
+	public static function output_error($type, $text, $file, $line, $shutdown = FALSE) {
 
-		// for shutdown output - only output if shutting down
+		// --- for shutdown output - only output if shutting down ---
 		$html = false;
 		if ( (defined('WP_DEBUG_ON_SHUTDOWN')) && WP_DEBUG_ON_SHUTDOWN) {
 			if ($shutdown) {$html = true;} else {return;}
 		}
 
-		// display output fixes
-		$e_text = strip_tags($e_text);
-		$e_text = str_replace("\r\n", "\n", $e_text);
-		$e_file = str_replace(ABSPATH, '', $e_file);
-		$e_display = self::$display_errors[$e_type];
+		// --- display output fixes ---
+		$text = strip_tags($text);
+		$text = str_replace("\r\n", "\n", $text);
+		$file = str_replace(ABSPATH, '', $file);
+		$display = self::$display_errors[$type];
 
-		// maybe wrap in HTML for display
+		// --- maybe wrap in HTML for display ---
 		if ( $html && (ini_get('html_errors')) ) {
-			$e_display = "<font color='red'>".$e_display."</font>";
-			$e_line = "<font color='green'><b>".$e_line."</b></font>";
-			$e_file = "<font color='blue'>".$e_file."</font>";
-			$e_text = str_replace("\n", "<br>", $e_text);
-			$e_text = "<b>".$e_text."</b>";
+			$display = "<font color='red'>".$display."</font>";
+			$line = "<font color='green'><b>".$line."</b></font>";
+			$file = "<font color='blue'>".$file."</font>";
+			$text = str_replace("\n", "<br>", $text);
+			$text = "<b>".$text."</b>";
 		}
 
-		// set error message line
-		$message = $e_display." on line ".$e_line." of file ".$e_file." : ".$e_text;
+		// --- set error message line ---
+		$message = $display." on line ".$line." of file ".$file." : ".$text;
 
-		// debug to browser console
+		// --- maybe debug to browser console ---
 		if ( (defined('WP_DEBUG_TO_CONSOLE')) && WP_DEBUG_TO_CONSOLE) {
 			// escape new lines and quotes, and strip tags for javascript output
 			$message = str_replace("\n", "\\n", $message);
 			$message = str_replace("'", "\'", $message);
 
-			// no-crash javascript console fix for Internet Explorer
+			// --- no-crash javascript console fix for Internet Explorer ---
 			// ref: https://www.codeforest.net/debugging-php-in-browsers-javascript-console
 			if (!self::$ieconsolefixed) {
 				echo '<script>if (!window.console) console = {};';
@@ -434,25 +448,26 @@ class DebugErrorHandler {
 				echo 'console.debug = console.debug || function(){};</script>';
 				self::$ieconsolefixed = TRUE;
 
-				// output to console basic debug option info
+				// --- output to console basic debug option info ---
 				echo "<script>console.log('".WP_DEBUG_INFO."');</script>";
 			}
 
-			// output script wrapper for logging to console
-			$logtype = self::$console_errors[$e_type];
+			// --- output script wrapper for logging to console ---
+			$logtype = self::$console_errors[$type];
 			$message = "<script>console.".$logtype."('".$message."');</script>";
 		}
 
 		echo $message;
 	}
 
-	public static function error_handler($e_number = '', $e_text = '', $e_file = '', $e_line = '') {
-		self::set_throwable($e_number, $e_text, $e_file, $e_line, WP_DEBUG_LOG);
+	public static function error_handler($number = '', $text = '', $file = '', $line = '') {
+		self::set_throwable($number, $text, $file, $line, WP_DEBUG_LOG);
 		return true;
 	}
 
 	public static function exception_handler(Exception $e) {
-		// [Disabled, causes this] Fatal error: Uncaught TypeError: Argument 1 passed to
+		// [Currently disabled as causing this:]
+		// "Fatal error: Uncaught TypeError: Argument 1 passed to
 		// DebugErrorHandler::exception_handler() must be an instance of Exception, instance of ParseError given
 		self::set_throwable($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
 		return true;
@@ -460,7 +475,7 @@ class DebugErrorHandler {
 
 	public static function shutdown_handler() {
 
-		// get last (possibly fatal) error
+		// --- get last (possibly fatal) error ---
 		$e = error_get_last();
 		if ($e !== NULL) {
 			self::set_throwable($e['type'], $e['message'], $e['file'], $e['line'], WP_DEBUG_LOG);
@@ -469,7 +484,7 @@ class DebugErrorHandler {
 			}
 		}
 
-		// maybe output all errors on shutdown
+		// --- maybe output all errors on shutdown ---
 		if ( WP_DEBUG_DISPLAY && (defined('WP_DEBUG_ON_SHUTDOWN')) && WP_DEBUG_ON_SHUTDOWN) {
 
 			$html = true;
@@ -477,10 +492,10 @@ class DebugErrorHandler {
 
 			if ($html) {
 
-				// error display box style
+				// --- error display box style ---
 				echo "<style>.error-display-box {background-color:#DDD; padding:20px; line-height:1.2em; font-size:1em;}</style>";
 
-				// load/severity display switcher
+				//--- load/severity display switcher script ---
 				echo "<script>function showhidebacktrace(id) {
 					if (document.getElementById('backtrace-'+id).style.display == '') {
 						document.getElementById('backtrace-'+id).style.display = 'none';
@@ -496,7 +511,7 @@ class DebugErrorHandler {
 				}</script>";
 			}
 
-			// output basic debug option info
+			// --- output basic debug option info ---
 			if ($html) {echo "<div id='php-debug-info' class='error-display-box'>";}
 			echo WP_DEBUG_INFO;
 			if ($html) {
@@ -510,7 +525,7 @@ class DebugErrorHandler {
 				echo "</font></div><br>";
 			}
 
-			// loop errors and display output
+			// --- loop errors and display output ---
 			if ($html) {
 				echo "<div id='php-error-display' class='error-display-box' style='display:none;'>";
 				echo "<b>Errors by Load Order</b><br><br>".PHP_EOL;
@@ -533,17 +548,17 @@ class DebugErrorHandler {
 			}
 			if ($html) {echo "</div>";}
 
-			// separate error  display by severity
+			// --- separate error display by severity ---
 			if ($html) {
 				echo "<div id='php-error-severity' class='error-display-box'>";
 				echo "<b>Errors by Severity</b><br><br>".PHP_EOL;
 			} else {echo PHP_EOL."Errors by Severity".PHP_EOL;}
 			if (count($severity) > 0) {
 				$j = 0;
-				foreach ($severity as $e_type => $error) {
+				foreach ($severity as $type => $error) {
 					foreach ($error as $e) {
 						if ($html) {echo "<p style='margin-bottom:5px' onclick='showhidebacktrace(\"x".$j."\");'>";}
-						self::output_error($e_type, $e['text'], $e['file'], $e['line'], TRUE);
+						self::output_error($type, $e['text'], $e['file'], $e['line'], TRUE);
 						if ($html) {
 							if (isset($e['backtrace'])) {
 								echo "<div id='backtrace-x".$j."' style='display:none;'>";
@@ -565,3 +580,4 @@ class DebugErrorHandler {
 	// }
 
 }
+
