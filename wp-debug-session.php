@@ -3,7 +3,7 @@
 /* ================ */
 /* WP Debug Session */
 /* ---------------- */
-/* . Version 1.04 . */
+/* . Version 1.05 . */
 /* ================ */
 
 // Home: https://gist.github.com/majick777/6c4e4074ce4a59fe09f7baa855732aee
@@ -64,7 +64,7 @@ $wp_debug_keys = array(
 
 // --- set default settings ---
 $wp_debug = array(
-	'switch' => '0', 'log' => '1', 'display' => '2', 'backtrace' => '1',
+	'switch' => '0', 'log' => '1', 'display' => '2', 'backtrace' => '0',
 	'html' => '1', 'ip' => '0', 'id' => NULL, 'info' => ''
 );
 
@@ -323,6 +323,8 @@ class DebugErrorHandler {
 
 	public static $throwables = array();
 
+	public static $oldhandler = null;
+
 	public static $ieconsolefixed = FALSE;
 
 	public static $error_types = array(
@@ -355,32 +357,35 @@ class DebugErrorHandler {
 	public function __construct() {
 
 		// --- set error handling method ---
-		set_error_handler(array($this, 'error_handler'));
+		$oldhandler = set_error_handler(array($this, 'error_handler'));
+		// 1.0.5: store existing error handler
+		if (!is_null($oldhandler)) {self::$oldhandler = $oldhandler;}
 
 		// --- set shutdown handling method ---
 		register_shutdown_function(array($this, 'shutdown_handler'));
 
-		// set exception handling method [disabled, see function for info]
+		// --- set exception handling method ---
+		// [disabled, see exception_handler method for more info]
 		// set_exception_handler(array($this, 'exception_handler'));
 
     }
 
-	public static function set_throwable($number, $text, $file, $line, $log = TRUE) {
+	public static function set_throwable($number, $text, $file, $line, $context) {
 
 		// --- maybe log to error log ---
-		if ($log) {
+		if (WP_DEBUG_LOG) {
 
 			// --- set default error message ---
 			$message = self::$error_types[$number].': line '.$line.' in '.$file.': '.$text;
 
 			// --- maybe add debug session ID to log message ---
 			if (defined('WP_DEBUG_SESSION') && WP_DEBUG_SESSION) {
-				// force debug session ID to alphanumeric (to be safest)
+				// --- force debug session ID to alphanumeric (to be safest) ---
 				$id = preg_replace("/[^0-9a-zA-Z]/i", '', WP_DEBUG_SESSION);
 				if ($id != '') {$message = WP_DEBUG_IP_ADDRESS.'['.$id.'] '.$message;}
 			} else {$message = WP_DEBUG_IP_ADDRESS.$message;}
 
-			// TODO: maybe use custom debug logger class (log4php)
+			// TODO: maybe use custom debug logger class (log4php) ?
 			// if (defined('WP_DEBUG_LOGGER') && WP_DEBUG_LOGGER) {
 			//	global $wp_debug_logger;
 			// 	if (WP_DEBUG_LOGGER == 'log4php') {$wp_debug_logger->???();}
@@ -391,7 +396,7 @@ class DebugErrorHandler {
 		}
 
 		// --- no display output if error message was suppressed using @ ---
-		if (0 === error_reporting()) {return;}
+		// if (0 === error_reporting()) {return;}
 
 		// --- maybe output error to display ---
 		if (WP_DEBUG_DISPLAY) {self::output_error(self::$error_types[$number], $text, $file, $line);}
@@ -400,6 +405,10 @@ class DebugErrorHandler {
 		$error = array('type' => self::$error_types[$number], 'text' => $text, 'file' => $file, 'line' => $line);
 		if (defined('WP_DEBUG_BACKTRACE') && WP_DEBUG_BACKTRACE) {$error['backtrace'] = debug_backtrace();}
 		self::$throwables[] = $error;
+
+		// --- maybe run existing error handler ---
+		// 1.0.5: pass values to old error handler
+		if (!is_null(self::$oldhandler)) {call_user_func(self::$oldhandler, $number, $text, $file, $line, $context);}
 
 		// --- disable default error reporting ---
 		return true;
@@ -433,7 +442,8 @@ class DebugErrorHandler {
 
 		// --- maybe debug to browser console ---
 		if ( (defined('WP_DEBUG_TO_CONSOLE')) && WP_DEBUG_TO_CONSOLE) {
-			// escape new lines and quotes, and strip tags for javascript output
+
+			// --- escape new lines and quotes, and strip tags for javascript output ---
 			$message = str_replace("\n", "\\n", $message);
 			$message = str_replace("'", "\'", $message);
 
@@ -460,8 +470,8 @@ class DebugErrorHandler {
 		echo $message;
 	}
 
-	public static function error_handler($number = '', $text = '', $file = '', $line = '') {
-		self::set_throwable($number, $text, $file, $line, WP_DEBUG_LOG);
+	public static function error_handler($number = '', $text = '', $file = '', $line = '', $context = '') {
+		self::set_throwable($number, $text, $file, $line, $context);
 		return true;
 	}
 
