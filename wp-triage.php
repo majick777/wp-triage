@@ -3,7 +3,7 @@
 /* ================= */
 /* === WP Triage === */
 /* ----------------- */
-/* . Version 1.0.8 . */
+/* . Version 1.0.9 . */
 /* ================= */
 
 // By WP Medic: https://wpmedic.tech
@@ -103,6 +103,8 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 				$wp_triage[$setting] = (int)$_COOKIE[$key];
 			} elseif ( 'id' == $setting ) {
 				$wp_triage[$setting] = $_COOKIE[$key];
+			} elseif ( 'backtrace' == $setting ) {
+				$wp_triage[$setting] = $_COOKIE[$key];
 			}
 		}
 
@@ -162,6 +164,9 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 				// $error_types = array();
 				// if ( in_array( $value, $error_types ) ) {
 					$wp_triage[$setting] = $value;
+					// 1.0.9: set cookie for backtrace value
+					$expires = isset( $expiry ) ? $expiry : ( time() + 3600 );
+					setcookie( $key, $value, $expires );
 				// }
 			}
 
@@ -380,6 +385,11 @@ if ( $wp_triage['log'] > 0 ) {
 		// TODO: maybe add a custom logging function ?
 		//
 	// }
+
+	// 1.0.9: define log file constant
+	if ( !defined( 'WP_TRIAGE_LOGFILE' ) ) {
+		define( 'WP_TRIAGE_LOGFILE', $wp_triage['logfile'] );
+	}
 
 } elseif ( !defined( 'WP_DEBUG_LOG' ) ) {
 	// --- fallback logging definition ---
@@ -626,7 +636,8 @@ class TriageErrorHandler {
 			// 	$wp_triage_logger->???();
 			// } else {
 				// --- use default error logging function ---
-				error_log( $message );
+				// 1.0.9: specify log file constant
+				error_log( $message, 3, WP_TRIAGE_LOGFILE );
 			// }
 		}
 
@@ -655,6 +666,13 @@ class TriageErrorHandler {
 					$error['backtrace'] = $backtrace;
 				} else {
 					$error['backtrace'] = self::debug_backtrace_string();
+				}
+				if ( WP_DEBUG_LOG ) {
+					// 1.0.9: add backtrace to debug log
+					$backtrace = str_replace( PHP_EOL, ' ------- ', $error['backtrace'] );
+					$backtrace = strip_tags( $backtrace );
+					$backtrace = str_replace( ' ------- ', PHP_EOL, $backtrace );
+					error_log( $backtrace, 3, WP_TRIAGE_LOGFILE );
 				}
 			}
 		}
@@ -985,7 +1003,8 @@ class TriageErrorHandler {
 					}
 					echo '<div class="error-line">';
 				}
-				self::output_error( $e['type'], $e['text'], $e['file'], $e['line'], $e['backtrace'], true );
+				$backtrace = isset( $e['backtrace'] ) ? $e['backtrace'] : false;
+				self::output_error( $e['type'], $e['text'], $e['file'], $e['line'], $backtrace, true );
 				$error = array( 'text' => $e['text'], 'file' => $e['file'], 'line' => $e['line'] );
 				if ( isset( $e['backtrace'] ) ) {
 					$error['backtrace'] = $e['backtrace'];
@@ -1028,7 +1047,8 @@ class TriageErrorHandler {
 							}
 							echo '<div class="error-line">';
 						}
-						self::output_error( $type, $e['text'], $e['file'], $e['line'], $e['backtrace'], true );
+						$backtrace = isset( $e['backtrace'] ) ? $e['backtrace'] : false;
+						self::output_error( $type, $e['text'], $e['file'], $e['line'], $backtrace, true );
 						if ( isset( $e['backtrace'] ) ) {
 							if ( $html ) {
 								echo '<div id="backtrace-x' . $j . '" class="backtrace-display" style="display:none;">';
