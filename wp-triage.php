@@ -3,7 +3,7 @@
 /* ================= */
 /* === WP Triage === */
 /* ----------------- */
-/* . Version 1.0.9 . */
+/* . Version 1.1.0 . */
 /* ================= */
 
 // By WP Medic: https://wpmedic.tech
@@ -206,13 +206,14 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 if ( defined( 'WP_TRIAGE' ) && !WP_TRIAGE ) {
 	$wp_triage['switch'] = 0;
 }
+// 1.0.8: define base switch as well
+// 1.1.0: always define if not yet defined
+if ( !defined( 'WP_TRIAGE' ) ) {
+	define( 'WP_TRIAGE', $wp_triage['switch'] );
+}
 
 // --- maybe set WP_DEBUG debug mode ---
 if ( $wp_triage['switch'] > 0 ) {
-	// 1.0.8: define base switch as well
-	if ( !defined( 'WP_TRIAGE' ) ) {
-		define( 'WP_TRIAGE', $wp_triage['switch'] );
-	}
 	if ( !defined( 'WP_DEBUG' ) ) {
 		define( 'WP_DEBUG', true );
 	}
