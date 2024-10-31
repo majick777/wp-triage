@@ -17,7 +17,6 @@ This focusses the debug information for a single user test session, displaying i
 is kept active via cookie value detection (eg. so it is persistent between POST requests etc.) Can output all errors to browser console or stores for output at all at once on PHP shutdown.
 Works with all errors including fatal errors and user errors if triggered.
 
-Please Note: This does not work on WordPress.Com hosting, due to the fact they do not allow you to override the fatal error handler. :-/
 
 ### Installation
 

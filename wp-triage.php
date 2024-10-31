@@ -3,7 +3,7 @@
 /* ================= */
 /* === WP Triage === */
 /* ----------------- */
-/* . Version 1.1.2 . */
+/* . Version 1.1.3 . */
 /* ================= */
 
 // By WP Medic: https://wpmedic.tech
@@ -80,6 +80,41 @@ $wp_triage = array(
 	'info' => array(),
 );
 
+// ------------------
+// WP Cron Debug Mode
+// ------------------
+// 1.1.3: added Cron debugging mode (enabled via define in wp-config.php)
+if ( defined( 'WP_CRON_DEBUG' ) && WP_CRON_DEBUG ) {
+
+	// --- detect querystring for alternative WP Cron reload ---
+	// if ( defined( 'ALTERNATE_WP_CRON' ) && ALTERNATE_WP_CRON ) {}
+	if ( ( defined( 'DOING_CRON' ) && DOING_CRON ) || isset( $_REQUEST['doing_wp_cron'] ) ) {
+		$debug_time = is_int( WP_CRON_DEBUG ) ? WP_CRON_DEBUG : 5;
+		$wp_triage['switch'] = $debug_time;
+		$wp_triage['backtrace'] = defined( 'WP_CRON_BACKTRACE' ) ? WP_CRON_BACKTRACE : 'error';
+	}
+
+	// --- filter WP Cron trigger URL ---
+	// nope, cannot add_filter in wp-config.php! unnecessary anyway
+	// add_filter( 'cron_request', 'wp_triage_cron_trigger', 11, 2 );
+	/* if ( !function_exists( 'wp_triage_cron_trigger' ) ) {
+		function wp_triage_cron_trigger( $request, $doing_wp_cron ) {
+			$debug_time = is_int( WP_CRON_DEBUG ) ? WP_CRON_DEBUG : 5;
+			$backtrace = defined( 'WP_CRON_BACKTRACE' ) ? WP_CRON_BACKTRACE : 'error';
+			$request['url'] = add_query_arg( 'wpdebug', $debug_time, $request['url'] );
+			$request['url'] = add_query_arg( 'backtrace', $backtrace, $request['url'] );
+
+			$logfile = dirname( __FILE__ ) . '/wp-content/debug.log';
+			$message = 'Cron Request URL: ' . $request['url'] . PHP_EOL;
+			error_log( $message, 3, $logfile );
+
+			return $request;
+		}
+	} */
+
+}
+
+
 // --- maybe clear setting cookies ---
 // TODO: allow switch to be wpdebug or wptriage
 // 1.0.4: do check to maybe clear all cookies first
@@ -98,9 +133,9 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 	foreach ( $wp_triage_keys as $setting => $key ) {
 
 		// --- check for existing cookies ---
-		if ( isset($_COOKIE[$key] ) ) {
+		if ( isset( $_COOKIE[$key] ) ) {
 			if ( ( is_numeric( $_COOKIE[$key] ) ) && ( $_COOKIE[$key] > 0 ) ) {
-				$wp_triage[$setting] = (int)$_COOKIE[$key];
+				$wp_triage[$setting] = (int) $_COOKIE[$key];
 			} elseif ( 'id' == $setting ) {
 				$wp_triage[$setting] = $_COOKIE[$key];
 			} elseif ( 'backtrace' == $setting ) {
@@ -180,9 +215,9 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 			} elseif ( ( is_numeric( $value ) ) && ( $value > 0 ) ) {
 
 				// --- use wpdebug setting as minutes for expiry ---
-				$wp_triage[$setting] = (int)$value;
+				$wp_triage[$setting] = (int) $value;
 				if ( $key == $wp_triage_keys['switch'] ) {
-					$expiry = time() + ( (int)$value * 60 );
+					$expiry = time() + ( (int) $value * 60 );
 					// --- set extra cookie for calculating expiry display ---
 					// 1.0.6: change cookie name to triageexpiry
 					setcookie( 'triageexpiry', $expiry, $expiry );
@@ -225,6 +260,9 @@ if ( $wp_triage['switch'] > 0 ) {
 		$expires = $_COOKIE['triageexpiry'];
 		// 1.0.3: fix to incorrect variable name (expiry)
 		$timeleft = round( ( ( $expires - time() ) / 60 ), 1, PHP_ROUND_HALF_DOWN );
+	} else {
+		// 1.1.3: fix timeleft value when no expiry
+		$timeleft = $wp_triage['switch'];
 	}
 	// 1.0.8: simplify plural check
 	$plural = ( $timeleft == 1 ) ? '' : 's';
@@ -1116,4 +1154,5 @@ class TriageErrorHandler {
 	}
 
 }
+
 
