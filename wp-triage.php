@@ -3,7 +3,7 @@
 /* ================= */
 /* === WP Triage === */
 /* ----------------- */
-/* . Version 1.1.0 . */
+/* . Version 1.1.3 . */
 /* ================= */
 
 // By WP Medic: https://wpmedic.tech
@@ -53,7 +53,7 @@
 // ip - whether to log IP address: 0 or 'off', 1 or 'on' [WP_TRIAGE_IP]
 // instance - set a specific ID for this debug session session [WP_TRIAGE_ID]
 //				(alphanumeric only, displayed and/or recorded in log)
-// triageclear - remove all lines from debug log for a specific debug ID session
+// clear - remove all lines from debug log for a specific debug ID session
 //				(set value to debug session ID to clear from log)
 
 // --- define querystring keys ---
@@ -80,6 +80,41 @@ $wp_triage = array(
 	'info' => array(),
 );
 
+// ------------------
+// WP Cron Debug Mode
+// ------------------
+// 1.1.3: added Cron debugging mode (enabled via define in wp-config.php)
+if ( defined( 'WP_CRON_DEBUG' ) && WP_CRON_DEBUG ) {
+
+	// --- detect querystring for alternative WP Cron reload ---
+	// if ( defined( 'ALTERNATE_WP_CRON' ) && ALTERNATE_WP_CRON ) {}
+	if ( ( defined( 'DOING_CRON' ) && DOING_CRON ) || isset( $_REQUEST['doing_wp_cron'] ) ) {
+		$debug_time = is_int( WP_CRON_DEBUG ) ? WP_CRON_DEBUG : 5;
+		$wp_triage['switch'] = $debug_time;
+		$wp_triage['backtrace'] = defined( 'WP_CRON_BACKTRACE' ) ? WP_CRON_BACKTRACE : 'error';
+	}
+
+	// --- filter WP Cron trigger URL ---
+	// nope, cannot add_filter in wp-config.php! unnecessary anyway
+	// add_filter( 'cron_request', 'wp_triage_cron_trigger', 11, 2 );
+	/* if ( !function_exists( 'wp_triage_cron_trigger' ) ) {
+		function wp_triage_cron_trigger( $request, $doing_wp_cron ) {
+			$debug_time = is_int( WP_CRON_DEBUG ) ? WP_CRON_DEBUG : 5;
+			$backtrace = defined( 'WP_CRON_BACKTRACE' ) ? WP_CRON_BACKTRACE : 'error';
+			$request['url'] = add_query_arg( 'wpdebug', $debug_time, $request['url'] );
+			$request['url'] = add_query_arg( 'backtrace', $backtrace, $request['url'] );
+
+			$logfile = dirname( __FILE__ ) . '/wp-content/debug.log';
+			$message = 'Cron Request URL: ' . $request['url'] . PHP_EOL;
+			error_log( $message, 3, $logfile );
+
+			return $request;
+		}
+	} */
+
+}
+
+
 // --- maybe clear setting cookies ---
 // TODO: allow switch to be wpdebug or wptriage
 // 1.0.4: do check to maybe clear all cookies first
@@ -98,9 +133,9 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 	foreach ( $wp_triage_keys as $setting => $key ) {
 
 		// --- check for existing cookies ---
-		if ( isset($_COOKIE[$key] ) ) {
+		if ( isset( $_COOKIE[$key] ) ) {
 			if ( ( is_numeric( $_COOKIE[$key] ) ) && ( $_COOKIE[$key] > 0 ) ) {
-				$wp_triage[$setting] = (int)$_COOKIE[$key];
+				$wp_triage[$setting] = (int) $_COOKIE[$key];
 			} elseif ( 'id' == $setting ) {
 				$wp_triage[$setting] = $_COOKIE[$key];
 			} elseif ( 'backtrace' == $setting ) {
@@ -180,9 +215,9 @@ if ( isset( $_GET[$wp_triage_keys['switch']] ) && in_array( $_GET[ $wp_triage_ke
 			} elseif ( ( is_numeric( $value ) ) && ( $value > 0 ) ) {
 
 				// --- use wpdebug setting as minutes for expiry ---
-				$wp_triage[$setting] = (int)$value;
+				$wp_triage[$setting] = (int) $value;
 				if ( $key == $wp_triage_keys['switch'] ) {
-					$expiry = time() + ( (int)$value * 60 );
+					$expiry = time() + ( (int) $value * 60 );
 					// --- set extra cookie for calculating expiry display ---
 					// 1.0.6: change cookie name to triageexpiry
 					setcookie( 'triageexpiry', $expiry, $expiry );
@@ -225,6 +260,9 @@ if ( $wp_triage['switch'] > 0 ) {
 		$expires = $_COOKIE['triageexpiry'];
 		// 1.0.3: fix to incorrect variable name (expiry)
 		$timeleft = round( ( ( $expires - time() ) / 60 ), 1, PHP_ROUND_HALF_DOWN );
+	} else {
+		// 1.1.3: fix timeleft value when no expiry
+		$timeleft = $wp_triage['switch'];
 	}
 	// 1.0.8: simplify plural check
 	$plural = ( $timeleft == 1 ) ? '' : 's';
@@ -670,7 +708,13 @@ class TriageErrorHandler {
 				}
 				if ( WP_DEBUG_LOG ) {
 					// 1.0.9: add backtrace to debug log
-					$backtrace = str_replace( PHP_EOL, ' ------- ', $error['backtrace'] );
+					// 1.1.2: maybe convert backtrace to string
+					if ( is_array( $error['backtrace'] ) ) {
+						$backtrace = self::debug_backtrace_string( $error['backtrace'] );
+					} else {
+						$backtrace = $error['backtrace'];
+					}
+					$backtrace = str_replace( PHP_EOL, ' ------- ', $backtrace );
 					$backtrace = strip_tags( $backtrace );
 					$backtrace = str_replace( ' ------- ', PHP_EOL, $backtrace );
 					error_log( $backtrace, 3, WP_TRIAGE_LOGFILE );
@@ -794,11 +838,14 @@ class TriageErrorHandler {
 	// Debug Backtrace String
 	// ----------------------
 	// ref: https://stackoverflow.com/a/15439989/5240159
-	public static function debug_backtrace_string() {
+	// 1.1.2: add trace argument (to allow processing existing trace)
+	public static function debug_backtrace_string( $trace = false ) {
 		$html = ( defined( 'WP_TRIAGE_TEXT_ONLY' ) && WP_TRIAGE_TEXT_ONLY ) ? false : true;
 		$stack = '';
 		$i = 1;
-		$trace = debug_backtrace();
+		if ( !$trace ) {
+			$trace = debug_backtrace();
+		}
 		unset( $trace[0] );
 		foreach ( $trace as $node ) {
 			if ( !isset( $node['class'] ) || !strstr( $node['class'], 'TriageErrorHandler' ) ) {
@@ -809,16 +856,11 @@ class TriageErrorHandler {
 				if ( $html ) {
 					$stack .= '</font>';
 				}
-				if ( isset( $node['file'] ) ) {
-					if ( $html ) {
-						$stack .= '<font color="blue">';
-					}
-					$abspath = substr( ABSPATH, 0, -1 );
-					$stack .= str_replace( $abspath, '', $node['file'] );
-					if ( $html ) {
-						$stack .= '</font>';
-					}
+				// 1.1.2: swap class/function with file for readability
+				if (isset( $node['class'] ) ) {
+					$stack .= $node['class'] . "->"; 
 				}
+				$stack .= $node['function'] . "()";
 				if ( isset( $node['line'] ) ) {
 					$stack .= " on line ";
 					if ( $html ) {
@@ -830,10 +872,16 @@ class TriageErrorHandler {
 					}
 				}
 				$stack .= " of "; 
-				if (isset( $node['class'] ) ) {
-					$stack .= $node['class'] . "->"; 
+				if ( isset( $node['file'] ) ) {
+					if ( $html ) {
+						$stack .= '<font color="blue">';
+					}
+					$abspath = substr( ABSPATH, 0, -1 );
+					$stack .= str_replace( $abspath, '', $node['file'] );
+					if ( $html ) {
+						$stack .= '</font>';
+					}
 				}
-				$stack .= $node['function'] . "()";
 				if ( $html ) {
 					$stack .= '<br>';
 				}
@@ -1106,4 +1154,5 @@ class TriageErrorHandler {
 	}
 
 }
+
 
