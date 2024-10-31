@@ -3,7 +3,7 @@
 /* ================= */
 /* === WP Triage === */
 /* ----------------- */
-/* . Version 1.1.0 . */
+/* . Version 1.1.2 . */
 /* ================= */
 
 // By WP Medic: https://wpmedic.tech
@@ -53,7 +53,7 @@
 // ip - whether to log IP address: 0 or 'off', 1 or 'on' [WP_TRIAGE_IP]
 // instance - set a specific ID for this debug session session [WP_TRIAGE_ID]
 //				(alphanumeric only, displayed and/or recorded in log)
-// triageclear - remove all lines from debug log for a specific debug ID session
+// clear - remove all lines from debug log for a specific debug ID session
 //				(set value to debug session ID to clear from log)
 
 // --- define querystring keys ---
@@ -670,7 +670,13 @@ class TriageErrorHandler {
 				}
 				if ( WP_DEBUG_LOG ) {
 					// 1.0.9: add backtrace to debug log
-					$backtrace = str_replace( PHP_EOL, ' ------- ', $error['backtrace'] );
+					// 1.1.2: maybe convert backtrace to string
+					if ( is_array( $error['backtrace'] ) ) {
+						$backtrace = self::debug_backtrace_string( $error['backtrace'] );
+					} else {
+						$backtrace = $error['backtrace'];
+					}
+					$backtrace = str_replace( PHP_EOL, ' ------- ', $backtrace );
 					$backtrace = strip_tags( $backtrace );
 					$backtrace = str_replace( ' ------- ', PHP_EOL, $backtrace );
 					error_log( $backtrace, 3, WP_TRIAGE_LOGFILE );
@@ -794,11 +800,14 @@ class TriageErrorHandler {
 	// Debug Backtrace String
 	// ----------------------
 	// ref: https://stackoverflow.com/a/15439989/5240159
-	public static function debug_backtrace_string() {
+	// 1.1.2: add trace argument (to allow processing existing trace)
+	public static function debug_backtrace_string( $trace = false ) {
 		$html = ( defined( 'WP_TRIAGE_TEXT_ONLY' ) && WP_TRIAGE_TEXT_ONLY ) ? false : true;
 		$stack = '';
 		$i = 1;
-		$trace = debug_backtrace();
+		if ( !$trace ) {
+			$trace = debug_backtrace();
+		}
 		unset( $trace[0] );
 		foreach ( $trace as $node ) {
 			if ( !isset( $node['class'] ) || !strstr( $node['class'], 'TriageErrorHandler' ) ) {
@@ -809,16 +818,11 @@ class TriageErrorHandler {
 				if ( $html ) {
 					$stack .= '</font>';
 				}
-				if ( isset( $node['file'] ) ) {
-					if ( $html ) {
-						$stack .= '<font color="blue">';
-					}
-					$abspath = substr( ABSPATH, 0, -1 );
-					$stack .= str_replace( $abspath, '', $node['file'] );
-					if ( $html ) {
-						$stack .= '</font>';
-					}
+				// 1.1.2: swap class/function with file for readability
+				if (isset( $node['class'] ) ) {
+					$stack .= $node['class'] . "->"; 
 				}
+				$stack .= $node['function'] . "()";
 				if ( isset( $node['line'] ) ) {
 					$stack .= " on line ";
 					if ( $html ) {
@@ -830,10 +834,16 @@ class TriageErrorHandler {
 					}
 				}
 				$stack .= " of "; 
-				if (isset( $node['class'] ) ) {
-					$stack .= $node['class'] . "->"; 
+				if ( isset( $node['file'] ) ) {
+					if ( $html ) {
+						$stack .= '<font color="blue">';
+					}
+					$abspath = substr( ABSPATH, 0, -1 );
+					$stack .= str_replace( $abspath, '', $node['file'] );
+					if ( $html ) {
+						$stack .= '</font>';
+					}
 				}
-				$stack .= $node['function'] . "()";
 				if ( $html ) {
 					$stack .= '<br>';
 				}
