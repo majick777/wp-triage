@@ -3,7 +3,7 @@
 /* ================= */
 /* === WP Triage === */
 /* ----------------- */
-/* . Version 1.1.3 . */
+/* . Version 1.1.4 . */
 /* ================= */
 
 // By WP Medic: https://wpmedic.tech
@@ -603,14 +603,28 @@ class TriageErrorHandler {
 	// --- array of error type codes ---
 	public static function error_types( $key ) {
 		$error_types = array(
-			E_ERROR => 'E_ERROR', E_WARNING => 'E_WARNING', E_PARSE => 'E_PARSE', E_NOTICE => 'E_NOTICE',
-			E_CORE_ERROR => 'E_CORE_ERROR', E_CORE_WARNING => 'E_CORE_WARNING',
-			E_COMPILE_ERROR => 'E_COMPILE_ERROR', E_COMPILE_WARNING => 'E_COMPILE_WARNING',
-			E_USER_ERROR => 'E_USER_ERROR', E_USER_WARNING => 'E_USER_WARNING', E_USER_NOTICE => 'E_USER_NOTICE',
-			E_STRICT => 'E_STRICT', E_RECOVERABLE_ERROR => 'E_RECOVERABLE_ERROR',
-			E_DEPRECATED => 'E_DEPRECATED', E_USER_DEPRECATED => 'E_USER_DEPRECATED'
+			'E_ERROR', 'E_WARNING', 'E_PARSE', 'E_NOTICE',
+			'E_CORE_ERROR', 'E_CORE_WARNING',
+			'E_COMPILE_ERROR', 'E_COMPILE_WARNING',
+			'E_USER_ERROR', 'E_USER_WARNING', 'E_USER_NOTICE',
+			'E_STRICT', 'E_RECOVERABLE_ERROR',
+			'E_DEPRECATED', 'E_USER_DEPRECATED'
 		);
-		return $error_types[$key];
+		$errors = array();
+		foreach ( $error_types as $error_type ) {
+			// 1.1.4: added check if constant is defined
+			if ( defined( $error_type ) ) {
+				// 1.1.4: skip E_STRICT for PHP 8.4+
+				if ( ( $error_type != 'E_STRICT' ) || ( PHP_VERSION_ID < 80400 ) ) {
+					$error_key = constant( $error_type );
+					$errors[$error_key] = $error_type;
+				}
+			}
+		}
+		if ( isset( $errors[$key] ) ) {
+			return $errors[$key];
+		}
+		return 'E_NOTICE';
 	}
 
 	// --- console error labels ---
